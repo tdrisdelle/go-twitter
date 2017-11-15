@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/base64"
 	"flag"
 	"fmt"
 	"log"
@@ -9,22 +10,36 @@ import (
 	"github.com/coreos/pkg/flagutil"
 	"github.com/dghubble/go-twitter/twitter"
 	"golang.org/x/oauth2"
+	"golang.org/x/oauth2/clientcredentials"
 )
 
 func main() {
 	flags := flag.NewFlagSet("app-auth", flag.ExitOnError)
-	accessToken := flags.String("app-access-token", "", "Twitter Application Access Token")
+	consumerKey := flags.String("consumer-key", "", "Twitter Consumer Key")
+	consumerSecret := flags.String("consumer-secret", "", "Twitter Consumer Secret")
+	accessToken := flags.String("access-token", "", "Twitter Access Token")
+	accessSecret := flags.String("access-secret", "", "Twitter Access Secret")
 	flags.Parse(os.Args[1:])
 	flagutil.SetFlagsFromEnv(flags, "TWITTER")
 
-	if *accessToken == "" {
+	if *consumerKey == "" || *consumerSecret == "" || *accessToken == "" || *accessSecret == "" {
+		log.Fatal("Consumer key/secret and Access token/secret required")
+	}
+
+	data := []byte(*consumerKey + ":" + *consumerSecret)
+	appAccessToken := base64.StdEncoding.EncodeToString(data)
+
+	if appAccessToken == "" {
 		log.Fatal("Application Access Token required")
 	}
 
-	config := &oauth2.Config{}
-	token := &oauth2.Token{AccessToken: *accessToken}
+	config := &clientcredentials.Config{
+		ClientID:	*consumerKey,
+		ClientSecret:	*consumerSecret,
+		TokenURL:	"https://api.twitter.com/oauth2/token",
+	}
 	// OAuth2 http.Client will automatically authorize Requests
-	httpClient := config.Client(oauth2.NoContext, token)
+	httpClient := config.Client(oauth2.NoContext)
 
 	// Twitter client
 	client := twitter.NewClient(httpClient)
@@ -33,6 +48,7 @@ func main() {
 	userShowParams := &twitter.UserShowParams{ScreenName: "golang"}
 	user, _, _ := client.Users.Show(userShowParams)
 	fmt.Printf("USERS SHOW:\n%+v\n", user)
+
 
 	// users lookup
 	userLookupParams := &twitter.UserLookupParams{ScreenName: []string{"golang", "gophercon"}}
